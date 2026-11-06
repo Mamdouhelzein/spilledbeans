@@ -1,0 +1,14 @@
+# For users of the pre-commit framework (https://pre-commit.com):
+#
+#   repos:
+#     - repo: https://github.com/Mamdouhelzein/spilledbeans
+#       rev: v0.1.0
+#       hooks:
+#         - id: spilledbeans
+- id: spilledbeans
+  name: spilledbeans (block commits containing secrets)
+  entry: beans scan --staged
+  language: python
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit]
