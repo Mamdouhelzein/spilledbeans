@@ -34,7 +34,7 @@ ENV_LINE_RE = re.compile(
 )
 
 PLACEHOLDER_RE = re.compile(
-    r"(?i)^(?:<.*>|\$\{.*\}|\{\{.*\}\}|%\(.*\)s?|x{6,}|\*{4,}|\.{3,}|"
+    r"(?i)^(?:<.*>|\$\{.*\}|\{\{.*\}\}|\{[A-Za-z_][\w.\[\]]*\}|%\(.*\)s?|x{6,}|\*{4,}|\.{3,}|"
     r".*(?:your[_\-]?(?:api[_\-]?)?(?:key|token|secret)|changeme|change[_\-]me|placeholder|"
     r"replace[_\-]?me|insert[_\-]|redacted|removed-by-spilledbeans).*)$"
 )

@@ -91,7 +91,7 @@ def test_cli_clean_repo(repo):
 
 
 def test_low_confidence_only_exits_zero(repo):
-    repo.commit("init", **{"a.py": 'db_password = "Xk9#mQ2$vL7pR4wZ8nB3"\n'})
+    repo.commit("init", **{"a.py": 'db_password = "Xk9#mQ2$vL7pR4wZ8nB3"\n'})  # beans:ignore
     result = runner.invoke(app, ["scan", str(repo.path)])
     assert result.exit_code == 0
     assert "low-confidence" in result.output

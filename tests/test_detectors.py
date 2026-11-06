@@ -32,13 +32,13 @@ def test_anthropic_key_is_not_reported_as_openai():
 
 
 def test_aws_secret_key_with_context():
-    secret = "wJalrXUtnFEMI/K7MDENG/bPxRfiCY" + "EXAMPLEKEY"
-    matches = detectors.detect_line(f"aws_secret_access_key = {secret}", 1)
+    secret = "wJalrXUtnFEMI/K7MDENG/bPxRfiCY" + "EXAMPLEKEY"  # beans:ignore
+    matches = detectors.detect_line(f"aws_secret_access_key = {secret}", 1)  # beans:ignore
     assert [m.secret for m in matches] == [secret]
 
 
 def test_generic_high_entropy_is_low_confidence():
-    matches = detectors.detect_line('db_password = "Xk9#mQ2$vL7pR4wZ8nB3"', 1)
+    matches = detectors.detect_line('db_password = "Xk9#mQ2$vL7pR4wZ8nB3"', 1)  # beans:ignore
     assert len(matches) == 1
     assert matches[0].provider_id == "generic"
     assert matches[0].confidence == "low"
@@ -48,6 +48,7 @@ def test_generic_ignores_low_entropy_and_placeholders():
     assert detectors.detect_line('api_key = "aaaaaaaaaaaaaaaaaaaa"', 1) == []
     assert detectors.detect_line('api_key = "your_api_key_here_please"', 1) == []
     assert detectors.detect_line('api_key = "${OPENAI_API_KEY_FROM_ENV}"', 1) == []
+    assert detectors.detect_line('api_key = "{API_KEY_FROM_SETTINGS}"', 1) == []
 
 
 def test_ignore_marker():
