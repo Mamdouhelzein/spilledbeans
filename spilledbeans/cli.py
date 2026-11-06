@@ -146,3 +146,74 @@ def hook_uninstall(path: Path = typer.Argument(Path("."), exists=True, file_okay
         console.print("[green]✓ Removed the spilledbeans pre-commit hook.[/green]")
     else:
         console.print("No spilledbeans hook installed.")
+
+
+@app.command("filter")
+def filter_cmd(
+    file: str = typer.Argument(
+        ..., metavar="FILE", help="Gitleaks or TruffleHog JSON report ('-' for stdin)."
+    ),
+    show_all: bool = typer.Option(
+        False, "--show-all", help="Show every finding with its score, not just likely-real ones."
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Machine-readable output (secrets masked)."),
+    threshold: float = typer.Option(
+        0.5, "--threshold", min=0.0, max=1.0, help="Score at or above which a finding counts as likely real."
+    ),
+    label_mode: bool = typer.Option(
+        False, "--label", help="Interactively mark findings real/noise and save to a CSV."
+    ),
+    labels_file: Path = typer.Option(
+        Path("spilledbeans-labels.csv"), "--labels-file", help="CSV for --label (no secrets are written)."
+    ),
+) -> None:
+    """Filter false positives out of Gitleaks/TruffleHog output (format auto-detected).
+
+    Exit code 1 if any likely-real finding remains, 0 otherwise.
+    """
+    import sys
+
+    from . import filtering, importers, scoring
+
+    try:
+        text = sys.stdin.read() if file == "-" else Path(file).read_text(encoding="utf-8")
+    except OSError as e:
+        err.print(f"[red]error:[/red] can't read {file}: {e}")
+        raise typer.Exit(2) from e
+    try:
+        fmt, findings = importers.parse(text)
+    except importers.UnknownFormat as e:
+        err.print(f"[red]error:[/red] {e}")
+        raise typer.Exit(2) from e
+
+    items = filtering.score_all(findings, scoring.RuleScorer())
+
+    if label_mode:
+        labelled, skipped = filtering.label(items, labels_file, console)
+        console.print(f"\nSaved {labelled} label(s) to [cyan]{labels_file}[/cyan] ({skipped} skipped).")
+        raise typer.Exit(0)
+
+    real = [s for s in items if s.result.likely_real(threshold)]
+    shown = items if show_all else real
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "format": fmt,
+                    "total": len(items),
+                    "likely_real": len(real),
+                    "findings": [s.to_dict(threshold) for s in shown],
+                },
+                indent=2,
+            )
+        )
+        raise typer.Exit(1 if real else 0)
+
+    console.print(f"Read [bold]{len(items)}[/bold] {fmt} finding(s).")
+    if shown:
+        console.print(filtering.table(shown, threshold, show_all))
+    console.print(
+        f"[bold]{len(real)}[/bold] likely real, [green]{len(items) - len(real)}[/green] likely noise "
+        f"(threshold {threshold:.2f})." + ("" if show_all else " Use --show-all to see everything.")
+    )
+    raise typer.Exit(1 if real else 0)
