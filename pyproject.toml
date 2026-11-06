@@ -51,6 +51,8 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+# B008: Typer declares options via function-call defaults. E501: the formatter owns line length.
+ignore = ["B008", "E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

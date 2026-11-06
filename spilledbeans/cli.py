@@ -36,10 +36,16 @@ def main(
 
 @app.command()
 def scan(
-    path: Path = typer.Argument(Path("."), exists=True, file_okay=False, help="Repository or folder to scan."),
-    staged: bool = typer.Option(False, "--staged", help="Scan only staged changes (used by the pre-commit hook)."),
+    path: Path = typer.Argument(
+        Path("."), exists=True, file_okay=False, help="Repository or folder to scan."
+    ),
+    staged: bool = typer.Option(
+        False, "--staged", help="Scan only staged changes (used by the pre-commit hook)."
+    ),
     as_json: bool = typer.Option(False, "--json", help="Machine-readable output."),
-    no_history: bool = typer.Option(False, "--no-history", help="Skip git history; scan the working tree only."),
+    no_history: bool = typer.Option(
+        False, "--no-history", help="Skip git history; scan the working tree only."
+    ),
 ) -> None:
     """Scan the working tree AND full git history for secrets.
 
@@ -88,3 +94,55 @@ class _nullctx:
 
     def __exit__(self, *a):
         return False
+
+
+@app.command()
+def fix(
+    path: Path = typer.Argument(Path("."), exists=True, file_okay=False, help="Repository to clean."),
+) -> None:
+    """Guided cleanup: rotate → plan → backup → dry run → rewrite → verify → next steps → prevent.
+
+    Never pushes. Never prints a full secret. Refuses to run with uncommitted changes.
+    """
+    from .fixer import run_fix
+
+    raise typer.Exit(run_fix(path, console))
+
+
+hook_app = typer.Typer(help="Manage the pre-commit hook that blocks commits containing secrets.")
+app.add_typer(hook_app, name="hook")
+
+
+@hook_app.command("install")
+def hook_install(
+    path: Path = typer.Argument(Path("."), exists=True, file_okay=False),
+    force: bool = typer.Option(
+        False, "--force", help="Replace an existing pre-commit hook (kept as a backup)."
+    ),
+) -> None:
+    """Install a git pre-commit hook that runs `beans scan --staged`."""
+    from . import hooks
+
+    if not gitutil.is_git_repo(path):
+        err.print(f"[red]error:[/red] {path} is not a git repository")
+        raise typer.Exit(2)
+    try:
+        hook_path = hooks.install(gitutil.repo_root(path), force=force)
+    except hooks.HookExists as e:
+        err.print(
+            f"[yellow]A pre-commit hook already exists at {e}.[/yellow] Re-run with --force to replace it "
+            "(the old hook is saved as pre-commit.before-spilledbeans)."
+        )
+        raise typer.Exit(1) from e
+    console.print(f"[green]✓ Installed pre-commit hook:[/green] {hook_path}")
+
+
+@hook_app.command("uninstall")
+def hook_uninstall(path: Path = typer.Argument(Path("."), exists=True, file_okay=False)) -> None:
+    """Remove the spilledbeans pre-commit hook (restores any hook it replaced)."""
+    from . import hooks
+
+    if hooks.uninstall(gitutil.repo_root(path)):
+        console.print("[green]✓ Removed the spilledbeans pre-commit hook.[/green]")
+    else:
+        console.print("No spilledbeans hook installed.")

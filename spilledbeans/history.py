@@ -118,9 +118,7 @@ def map_commits(root: Path, flagged_blobs: set[str]) -> dict[str, dict[str, set[
     if not flagged_blobs:
         return result
     pairs = [
-        ln.split()
-        for ln in gitutil.out(["log", "--all", "--format=%H %T"], root).splitlines()
-        if ln.strip()
+        ln.split() for ln in gitutil.out(["log", "--all", "--format=%H %T"], root).splitlines() if ln.strip()
     ]
     if not pairs:
         return result
@@ -165,6 +163,26 @@ def refs_containing(root: Path, commits: set[str]) -> list[str]:
                     break
             names.add(ref)
     return sorted(names)
+
+
+def objects_containing(root: Path, secrets: list[str]) -> set[str]:
+    """Return the subset of ``secrets`` still present in ANY blob in the object
+    database, reachable or not (stash, reflog leftovers, dangling objects)."""
+    remaining = {s: s.encode() for s in secrets}
+    found: set[str] = set()
+    listing = gitutil.out(
+        ["cat-file", "--batch-all-objects", "--batch-check=%(objectname) %(objecttype)"], root
+    )
+    blobs = [ln.split()[0] for ln in listing.splitlines() if ln.endswith((" blob", " commit", " tag"))]
+    for i in range(0, len(blobs), _BATCH):
+        for _typ, data in gitutil.read_objects(root, blobs[i : i + _BATCH]).values():
+            for s, b in list(remaining.items()):
+                if b in data:
+                    found.add(s)
+                    del remaining[s]
+        if not remaining:
+            break
+    return found
 
 
 def scan_history(root: Path) -> HistoryResult:
